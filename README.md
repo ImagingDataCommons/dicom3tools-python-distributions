@@ -305,7 +305,7 @@ Assertions are on output rather than exit status, and read both streams — see 
 
 ## License
 
-The packaging infrastructure in this repository is MIT licensed. dicom3tools itself is
+The packaging infrastructure in this repository is Apache-2.0 licensed. dicom3tools itself is
 distributed under David Clunie's BSD-style license, reproduced in `dicom3tools/share/COPYRIGHT`
 inside every wheel alongside the `VERSION.txt` naming the snapshot it was built from. The
 Windows wheels additionally bundle the Cygwin runtime DLLs, which are LGPL. See

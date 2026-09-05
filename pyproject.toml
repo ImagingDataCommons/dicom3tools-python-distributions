@@ -10,17 +10,22 @@ authors = [
 ]
 description = "Python distribution of David Clunie's dicom3tools DICOM command line utilities."
 readme = "README.md"
-license.file = "LICENSE"
+# PEP 639: an SPDX expression plus the file, rather than license.file alone -- that older
+# spelling copies the whole licence text into the metadata's License field, which is 12 KB of
+# Apache boilerplate where a nine-character identifier says the same thing. Note this is
+# mutually exclusive with a "License ::" classifier, which PEP 639 deprecates; declaring both
+# is a hard error out of the metadata backend, not a warning.
+#
+# This covers the packaging code in this repository. The bundled dicom3tools programs carry
+# David Clunie's own BSD-style license, installed to dicom3tools/share/COPYRIGHT inside every
+# wheel; the Windows wheels also bundle the LGPL Cygwin runtime.
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
   "Intended Audience :: Developers",
-  # MIT, matching LICENSE: this classifier describes the packaging code in this repository.
-  # The bundled dicom3tools programs carry David Clunie's own BSD-style license, installed to
-  # dicom3tools/share/COPYRIGHT inside every wheel. Same arrangement as the sibling plastimatch,
-  # dcmqi and s5cmd distributions, which are MIT and bundle their own upstreams.
-  "License :: OSI Approved :: MIT License",
   "Operating System :: MacOS",
   "Operating System :: Microsoft :: Windows",
   "Operating System :: POSIX :: Linux",
