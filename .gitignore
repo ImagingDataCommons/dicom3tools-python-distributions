@@ -1,0 +1,9 @@
+build/
+dist/
+wheelhouse/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+src/dicom3tools/_version.py

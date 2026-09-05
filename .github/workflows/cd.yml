@@ -1,0 +1,171 @@
+name: wheels
+
+# Builds the platform wheels and publishes them to PyPI on release.
+#
+# This workflow does no compiling: it downloads the prebuilt dicom3tools archives pinned in
+# dicom3toolsUrls.cmake and packages them, which is why it finishes in minutes rather than the
+# hours the binaries themselves take. The archives are produced by the build workflows in
+# ImagingDataCommons/dicom3tools and attached to a release there.
+
+on:
+  workflow_dispatch:
+  release:
+    types:
+      - published
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: 3
+
+jobs:
+  make_sdist:
+    name: Make SDist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Build SDist
+        run: pipx run build --sdist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cibw-sdist
+          path: dist/*.tar.gz
+
+  build_wheels:
+    name: Wheel on ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # One runner per target architecture -- see the note in ci.yml.
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x86_64
+          - os: windows-latest
+            arch: AMD64
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: pypa/cibuildwheel@v4.2.0
+        env:
+          CIBW_ARCHS: ${{ matrix.arch }}
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v7
+        with:
+          name: cibw-wheels-${{ matrix.os }}-${{ matrix.arch }}
+          path: wheelhouse/*.whl
+
+  test_sdist:
+    name: Test SDist with python ${{ matrix.python }}
+    needs: [make_sdist]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: cibw-sdist
+          path: dist
+
+      - name: Install SDist and test dependencies
+        run: |
+          pip install pytest pytest-cov
+          pip install dist/*.tar.gz
+          rm -rf dist
+
+      - name: Test installed SDist
+        run: pytest ./tests
+
+  check_dist:
+    name: Check dist
+    needs: [build_wheels, make_sdist, test_sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: all
+
+      - run: pipx run twine check --strict all/*/*
+
+      - name: Show wheel tags
+        run: ls -la all/*/*
+
+  # Where a release goes is decided by two things, both read off the GitHub release itself.
+  #
+  # The tag prefix picks out releases *of this package*. Only v-prefixed tags publish, matching
+  # the tag_regex setuptools_scm reads versions from, so any other tag namespace this
+  # repository grows -- and the dicom3tools.<snapshot> tags that name the archives it wraps --
+  # cannot trigger an upload.
+  #
+  # The prerelease flag then picks the index. Mark the release a pre-release (and tag it
+  # v<version>rc<n>) to rehearse on TestPyPI; a full release publishes to PyPI. Nothing goes to
+  # both, so a rehearsal cannot consume the real version number -- which matters because
+  # neither index ever lets a version be reused, even after deletion.
+
+  upload_testpypi:
+    name: Publish to TestPyPI
+    needs: [check_dist]
+    environment: testpypi
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'release' && github.event.action == 'published'
+      && startsWith(github.event.release.tag_name, 'v')
+      && github.event.release.prerelease
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cibw-*
+          path: dist
+          merge-multiple: true
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  upload_pypi:
+    name: Publish to PyPI
+    needs: [check_dist]
+    environment: pypi
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'release' && github.event.action == 'published'
+      && startsWith(github.event.release.tag_name, 'v')
+      && !github.event.release.prerelease
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cibw-*
+          path: dist
+          merge-multiple: true
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

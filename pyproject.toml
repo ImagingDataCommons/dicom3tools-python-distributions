@@ -1,0 +1,199 @@
+[build-system]
+requires = ["scikit-build-core"]
+build-backend = "scikit_build_core.build"
+
+
+[project]
+name = "dicom3tools"
+authors = [
+  { name = "Andrey Fedorov", email = "fedorov@bwh.harvard.edu" },
+]
+description = "Python distribution of David Clunie's dicom3tools DICOM command line utilities."
+readme = "README.md"
+license.file = "LICENSE"
+requires-python = ">=3.10"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Developers",
+  # MIT, matching LICENSE: this classifier describes the packaging code in this repository.
+  # The bundled dicom3tools programs carry David Clunie's own BSD-style license, installed to
+  # dicom3tools/share/COPYRIGHT inside every wheel. Same arrangement as the sibling plastimatch,
+  # dcmqi and s5cmd distributions, which are MIT and bundle their own upstreams.
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Medical Science Apps.",
+  "Typing :: Typed",
+]
+dynamic = ["version"]
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+  "pytest >=6",
+  "pytest-cov >=3",
+]
+dev = [
+  "pytest >=6",
+  "pytest-cov >=3",
+]
+
+[project.urls]
+Homepage = "https://github.com/ImagingDataCommons/dicom3tools-python-distributions"
+"Bug Tracker" = "https://github.com/ImagingDataCommons/dicom3tools-python-distributions/issues"
+Changelog = "https://github.com/ImagingDataCommons/dicom3tools-python-distributions/releases"
+Binaries = "https://github.com/ImagingDataCommons/dicom3tools/releases"
+Upstream = "https://www.dclunie.com/dicom3tools.html"
+
+
+# Launchers on PATH, one per program in binaries.txt -- keep the two files in step, since
+# CMakeLists.txt validates binaries.txt against the archive and tests/test_executable.py checks
+# that every name in it got a launcher. This is a curated subset of the 137 programs in a
+# dicom3tools archive; the rest ship in the wheel and are reachable from Python. See
+# binaries.txt for why.
+[project.scripts]
+dciodvfy = "dicom3tools:dciodvfy"
+dcentvfy = "dicom3tools:dcentvfy"
+dcdump = "dicom3tools:dcdump"
+dcfile = "dicom3tools:dcfile"
+dckey = "dicom3tools:dckey"
+dcinfo = "dicom3tools:dcinfo"
+dcdict = "dicom3tools:dcdict"
+dcsrdump = "dicom3tools:dcsrdump"
+dccidump = "dicom3tools:dccidump"
+dcdirdmp = "dicom3tools:dcdirdmp"
+dcanon = "dicom3tools:dcanon"
+dccp = "dicom3tools:dccp"
+dcuidchg = "dicom3tools:dcuidchg"
+dcsort = "dicom3tools:dcsort"
+dcmulti = "dicom3tools:dcmulti"
+dcdirmk = "dicom3tools:dcdirmk"
+dcdecmpr = "dicom3tools:dcdecmpr"
+dcstats = "dicom3tools:dcstats"
+dchist = "dicom3tools:dchist"
+dccmp = "dicom3tools:dccmp"
+dcdiff = "dicom3tools:dcdiff"
+dctoraw = "dicom3tools:dctoraw"
+rawtodc = "dicom3tools:rawtodc"
+dctopnm = "dicom3tools:dctopnm"
+dcsmpte = "dicom3tools:dcsmpte"
+dcdisp = "dicom3tools:dcdisp"
+
+[tool.scikit-build]
+minimum-version = "0.4"
+build-dir = "build/{wheel_tag}"
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+sdist.include = ["src/dicom3tools/_version.py"]
+# The wheels contain prebuilt executables and no compiled Python extension, so one wheel
+# per platform serves every supported interpreter.
+wheel.py-api = "py3"
+
+[tool.setuptools_scm]
+write_to = "src/dicom3tools/_version.py"
+# Releases are named after the upstream dicom3tools snapshot they package -- 1.0.<YYYYMMDD>,
+# upstream's 1.00 plus the snapshot date -- with packaging-only revisions as PEP 440
+# post-releases (1.0.20260901, then 1.0.20260901.post1). The default version_scheme,
+# guess-next-dev, does not fit that: it reports an untagged commit after 1.0.20260901 as
+# "1.0.20260902.dev2", inventing an upstream snapshot date that almost certainly does not
+# exist. post-release reports "1.0.20260901.post2" instead, which is what the next release from
+# here would actually be called. See the Versioning section of the README.
+version_scheme = "post-release"
+# Restricted to v-prefixed tags. At its defaults setuptools_scm matches any tag containing a
+# digit, and its default tag_regex has an optional "[\w-]+-" prefix group, so any other tag
+# namespace this repository grows would start being read as a version.
+tag_regex = "^v(?P<version>\\d+(?:\\.\\d+){0,2}[^\\+]*)(?:\\+.*)?$"
+git_describe_command = ["git", "describe", "--dirty", "--tags", "--long", "--match", "v*"]
+
+
+[tool.cibuildwheel]
+# The wheel holds prebuilt executables and no extension module, and is tagged py3 -- so one
+# build per platform is the whole matrix, and the interpreter it is built with only decides
+# which Python runs the tests.
+build = "cp312-*"
+# There is no musl dicom3tools archive to wrap; a musllinux build would silently package the
+# glibc binaries.
+skip = "*musllinux*"
+test-command = "pytest {project}/tests"
+test-extras = ["test"]
+
+[tool.cibuildwheel.linux]
+# auditwheel cannot do anything useful here: it repairs compiled extension modules, and this
+# wheel has none -- just prebuilt executables in dicom3tools/bin. Left to its default the wheel
+# would inherit the build container's manylinux tag regardless of what glibc the bundled
+# binaries actually need, which silently produces a wheel that pip happily installs and that
+# then fails with a GLIBC version error at run time. Derive the tag from the binaries instead.
+repair-wheel-command = "bash {project}/scripts/retag_linux_wheel.sh {wheel} {dest_dir}"
+# Test each wheel in the same container its binaries were compiled in, so the test run
+# exercises the oldest glibc the wheel's tag claims to support rather than whatever the
+# runner happens to have. These mirror the matrix in
+# ImagingDataCommons/dicom3tools/.github/workflows/build-linux-packages.yml, and the floors
+# in scripts/retag_linux_wheel.sh.
+manylinux-x86_64-image = "manylinux2014"
+manylinux-aarch64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.macos]
+# Same reasoning as the Linux repair step: delocate has no extension module to fix up, and the
+# wheel tag would otherwise reflect the build environment rather than the minimum macOS version
+# the bundled binaries actually support.
+repair-wheel-command = "bash {project}/scripts/retag_macos_wheel.sh {wheel} {dest_dir}"
+
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = [
+  "error",
+]
+log_cli_level = "INFO"
+testpaths = [
+  "tests",
+]
+
+
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint]
+extend-select = [
+  "B",        # flake8-bugbear
+  "I",        # isort
+  "ARG",      # flake8-unused-arguments
+  "C4",       # flake8-comprehensions
+  "EM",       # flake8-errmsg
+  "ICN",      # flake8-import-conventions
+  "G",        # flake8-logging-format
+  "PGH",      # pygrep-hooks
+  "PIE",      # flake8-pie
+  "PL",       # pylint
+  "PT",       # flake8-pytest-style
+  "PTH",      # flake8-use-pathlib
+  "RET",      # flake8-return
+  "RUF",      # Ruff-specific
+  "SIM",      # flake8-simplify
+  "T20",      # flake8-print
+  "UP",       # pyupgrade
+  "YTT",      # flake8-2020
+  "EXE",      # flake8-executable
+]
+ignore = [
+  "PLR09",    # Too many <...>
+  "PLR2004",  # Magic value used in comparison
+  "ISC001",   # Conflicts with formatter
+]
+isort.required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.per-file-ignores]
+# These are command line utilities; printing is their interface.
+"tests/**" = ["T20"]
+"scripts/**" = ["T20"]
+".github/scripts/**" = ["T20"]

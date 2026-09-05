@@ -1,0 +1,143 @@
+name: Update binary pins
+
+# Tracks new dicom3tools releases and opens a PR moving the pins in dicom3toolsUrls.cmake to
+# them.
+#
+# Upstream publishes a snapshot roughly monthly and ImagingDataCommons/dicom3tools cuts a
+# release from it; without something watching, the pins here quietly age and the wheels keep
+# shipping binaries from whenever someone last remembered. This does the mechanical half --
+# checksums, tag, version -- and leaves the judgement (does CI still pass on all five
+# platforms?) to the PR.
+#
+# The PR is deliberately not auto-merged: a new snapshot can add, rename or drop tools, and
+# CMakeLists.txt fails the build if anything in binaries.txt has disappeared. That failure
+# should be read by a person.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "dicom3tools release tag to pin (default: the latest release)"
+        required: false
+        type: string
+  schedule:
+    # Mondays, 06:17 UTC. Off the hour, because scheduled workflows on the hour are the ones
+    # GitHub delays most.
+    - cron: "17 6 * * 1"
+
+permissions:
+  # Enough to push the branch and open the PR. Note that this also needs "Allow GitHub Actions
+  # to create and approve pull requests" enabled in the repository's Actions settings.
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  BINARIES_REPO: ImagingDataCommons/dicom3tools
+
+jobs:
+  update:
+    name: Refresh pins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Work out which release to pin
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "$REQUESTED_TAG" ]; then
+            tag="$REQUESTED_TAG"
+          else
+            tag="$(gh api "repos/$BINARIES_REPO/releases/latest" --jq .tag_name)"
+          fi
+          echo "latest release: $tag"
+
+          pinned="$(grep -oP '(?<=^set\(DICOM3TOOLS_BINARIES_TAG ")[^"]*' dicom3toolsUrls.cmake)"
+          echo "currently pinned: $pinned"
+
+          if [ "$tag" = "$pinned" ]; then
+            echo "pins are already at $tag"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # A release exists from the moment the first build workflow finishes, so it can be
+          # seen here with only some of its archives attached. Pinning then is not a failure
+          # worth alerting on -- the next run picks it up complete.
+          missing=""
+          assets="$(gh api "repos/$BINARIES_REPO/releases/tags/$tag" --jq '.assets[].name')"
+          for asset in \
+            dicom3tools-linux-x86_64.tar.gz \
+            dicom3tools-linux-aarch64.tar.gz \
+            dicom3tools-macos-arm64.tar.gz \
+            dicom3tools-macos-x86_64.tar.gz \
+            dicom3tools-windows-x86_64.zip
+          do
+            grep -qxF "$asset" <<<"$assets" || missing="$missing $asset"
+          done
+
+          if [ -n "$missing" ]; then
+            echo "::notice::release $tag is missing$missing -- its build workflows have not all finished. Skipping."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "pinned=$pinned" >> "$GITHUB_OUTPUT"
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Rewrite the pins
+        if: steps.target.outputs.proceed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/update_dicom3tools_urls.py \
+            --repo "$BINARIES_REPO" --tag "${{ steps.target.outputs.tag }}"
+
+      - name: Confirm the new pins download and match
+        if: steps.target.outputs.proceed == 'true'
+        run: python .github/scripts/verify_pins.py
+
+      - name: Read the new wheel version
+        if: steps.target.outputs.proceed == 'true'
+        id: version
+        run: |
+          set -euo pipefail
+          version="$(grep -oP '(?<=^set\(dicom3tools_version  ")[^"]*' dicom3toolsUrls.cmake)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Open a pull request
+        if: steps.target.outputs.proceed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: update-pins
+          base: main
+          add-paths: dicom3toolsUrls.cmake
+          commit-message: "Pin dicom3tools ${{ steps.target.outputs.tag }}"
+          title: "Pin dicom3tools ${{ steps.target.outputs.tag }}"
+          delete-branch: true
+          body: |
+            Moves the binary pins from `${{ steps.target.outputs.pinned }}` to
+            [`${{ steps.target.outputs.tag }}`](https://github.com/${{ env.BINARIES_REPO }}/releases/tag/${{ steps.target.outputs.tag }}).
+
+            Wheels built from this would be version `${{ steps.target.outputs.version }}`.
+
+            Opened automatically by `.github/workflows/update-pins.yml`. Merging it does not
+            publish anything -- releasing is a separate, deliberate step (see the README).
+
+            **What to check before merging:** that CI builds and tests all five wheels. A new
+            upstream snapshot can add, rename or drop programs; if one named in `binaries.txt`
+            is gone, the build fails at configure time with a clear message, and the fix is to
+            update `binaries.txt` and `[project.scripts]` together.

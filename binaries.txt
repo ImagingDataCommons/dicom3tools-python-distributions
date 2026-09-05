@@ -1,0 +1,42 @@
+# The dicom3tools programs that get a console script launcher on PATH.
+#
+# This is a curated subset, not the whole toolkit: an archive holds 137 entries, and putting
+# names such as `ancp`, `dumptiff`, `pqsplit` and `rawdiff` on every user's PATH is a poor
+# trade for tools few people invoke by name. Everything else still ships inside the wheel, in
+# dicom3tools/bin, and stays reachable three ways -- `dicom3tools.<name>()`,
+# `dicom3tools.run("<name>", [...])` and `dicom3tools.bin_dir()` -- so nothing is lost.
+#
+# CMakeLists.txt fails the build if any name here is missing from the archive, and
+# tests/test_executable.py checks that each one got a launcher, so this file is a contract
+# rather than documentation. Keep it sorted by what the tool does.
+#
+# Read and verify
+dciodvfy
+dcentvfy
+dcdump
+dcfile
+dckey
+dcinfo
+dcdict
+dcsrdump
+dccidump
+dcdirdmp
+# Edit and organise
+dcanon
+dccp
+dcuidchg
+dcsort
+dcmulti
+dcdirmk
+dcdecmpr
+# Measure and compare
+dcstats
+dchist
+dccmp
+dcdiff
+# Convert and display
+dctoraw
+rawtodc
+dctopnm
+dcsmpte
+dcdisp

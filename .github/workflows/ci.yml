@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: 3
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pipx run ruff check --output-format=github .
+      - run: pipx run ruff format --check --diff .
+
+  wheels:
+    name: Wheel on ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # One runner per target architecture: the wheels wrap prebuilt single-architecture
+          # binaries, so there is nothing to cross-compile -- dicom3toolsUrls.cmake picks the
+          # archive from the host processor.
+          - os: ubuntu-latest
+            arch: x86_64
+          # Native arm64 Linux, free for public repositories, and the same runner the binaries
+          # themselves are built on in ImagingDataCommons/dicom3tools.
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x86_64
+          - os: windows-latest
+            arch: AMD64
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Builds the wheel, then runs tests/ against the installed wheel inside cibuildwheel's
+      # test environment (test-command in pyproject.toml). That covers the DICOM round-trip,
+      # so a broken archive pin, a missing tool or a binary that cannot read DICOM fails here
+      # rather than after publishing.
+      - uses: pypa/cibuildwheel@v4.2.0
+        env:
+          CIBW_ARCHS: ${{ matrix.arch }}
+
+      - name: Report wheel tag
+        shell: bash
+        run: ls -la wheelhouse/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheel-${{ matrix.os }}-${{ matrix.arch }}
+          path: wheelhouse/*.whl
+
+  # Guards the seam: confirms the archives named in dicom3toolsUrls.cmake still exist at the
+  # pinned URLs with the pinned checksums, and that the version recorded next to them still
+  # matches the pinned release tag. If the release hosting them is re-cut, this fails with a
+  # clear message instead of every wheel job failing on a hash mismatch.
+  verify_pins:
+    name: Verify archive pins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check every pinned archive
+        run: python .github/scripts/verify_pins.py
