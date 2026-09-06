@@ -182,29 +182,40 @@ which is what would catch a release whose assets were replaced.
 
 ## Versioning
 
-A release version is **upstream's `1.00` followed by the snapshot date** it packages, with
-packaging revisions as PEP 440 post-releases:
+A release version is **the date of the upstream snapshot it packages**, `YYYYMMDD` and nothing
+else, with packaging revisions as PEP 440 post-releases:
 
 | Wheel version | Means |
 | --- | --- |
-| `1.0.20260901` | the dicom3tools snapshot of 2026-09-01 |
-| `1.0.20260901.post1` | the same snapshot — binaries unchanged, packaging fixed |
-| `1.0.20261015` | the snapshot of 2026-10-15 |
+| `20260901` | the dicom3tools snapshot of 2026-09-01 |
+| `20260901.post1` | the same snapshot — binaries unchanged, packaging fixed |
+| `20261015` | the snapshot of 2026-10-15 |
 
 The sibling distributions mirror their upstream version exactly, which is not available here:
 dicom3tools has been version `1.00` for its entire life and distinguishes releases only by
-snapshot timestamp (`dicom3tools_1.00.snapshot.20260901072548.tar.bz2`). `1.0.<date>` keeps the
-upstream version visible, sorts correctly, and says which snapshot is inside — which is the only
-thing a user of this package is likely to reason about.
+snapshot timestamp (`dicom3tools_1.00.snapshot.20260901072548.tar.bz2`). So the date is the only
+thing that actually varies, and it is what a user of this package is likely to reason about.
+
+Dating the version rather than prefixing upstream's `1.00` (`1.0.20260901`) is deliberate. That
+prefix spends two segments encoding a constant, and it reads as *this package's* API version to
+anyone scanning a requirements file — which invites `dicom3tools~=1.0` or `<2`, constraints that
+look like compatibility promises. There is no API here to promise anything about beyond
+`run()` and `bin_dir()`; there are dated binaries. A bare date says that and claims nothing.
+
+Undotted rather than `2026.9.1`, for a mechanical reason: PEP 440 normalizes away leading zeros
+in release segments, so the natural-looking `2026.09.01` silently becomes `2026.9.1` and the git
+tag would permanently disagree with the wheel it produced. `20260901` is a single integer
+segment — it is `dicom3tools_snapshot[:8]` taken verbatim, with no transformation that could
+round-trip wrong. `tests/test_package.py` asserts the version equals its own normalization, so
+that trap cannot reopen.
 
 The time of day is dropped: two snapshots on the same day would collide, but upstream ships
 roughly monthly and a same-day re-snapshot can take a `.postN`. The full 14-digit timestamp is
 recorded in `dicom3toolsUrls.cmake` as `dicom3tools_snapshot`, and `VERSION.txt` inside each
 wheel names the exact upstream tarball, so a wheel is always traceable to a source snapshot.
 
-Post-releases rather than a fourth component (`1.0.20260901.1`, which would read as an upstream
-version that does not exist) or a local version (`1.0.20260901+d3t1`, which PyPI rejects
-outright).
+Post-releases rather than a fourth component (`20260901.1`, which would read as a date with a
+patch level) or a local version (`20260901+d3t1`, which PyPI rejects outright).
 
 ### Tags
 
@@ -212,7 +223,7 @@ Two independent tag namespaces are in play, in two different repositories:
 
 | Tag | Where | What it is | Published to |
 | --- | --- | --- | --- |
-| `v1.0.20260901` | here | a release of *this package* | PyPI |
+| `v20260901` | here | a release of *this package* | PyPI |
 | `dicom3tools.20260901072548.post3` | `ImagingDataCommons/dicom3tools` | a set of prebuilt archives | GitHub release only |
 
 Versions come from the `v` tags via `setuptools_scm`, so cutting a release is tagging one. Two
@@ -225,7 +236,7 @@ conventional:
 - The upload jobs in `cd.yml` are gated on the release tag starting with `v`.
 
 `version_scheme = "post-release"` is set deliberately: the default, `guess-next-dev`, would
-report an untagged commit after `v1.0.20260901` as `1.0.20260902.dev2` — inventing an upstream
+report an untagged commit after `v20260901` as `20260902.dev2` — inventing an upstream
 snapshot date that almost certainly does not exist. Untagged builds also carry a local version
 segment (`+g<sha>`), which PyPI refuses, so a development build cannot be uploaded by accident.
 
@@ -265,8 +276,8 @@ and a rehearsal cannot consume the real version number:
 
 | Release | Tag | Publishes to |
 | --- | --- | --- |
-| pre-release | `v1.0.20260901rc1` | TestPyPI |
-| full release | `v1.0.20260901` | PyPI |
+| pre-release | `v20260901rc1` | TestPyPI |
+| full release | `v20260901` | PyPI |
 
 The full sequence for a new upstream snapshot:
 

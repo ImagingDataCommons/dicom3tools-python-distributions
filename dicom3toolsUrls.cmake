@@ -36,7 +36,7 @@ set(DICOM3TOOLS_BINARIES_BASE_URL ""
 # Do not edit this section directly.
 
 set(dicom3tools_snapshot "20260901072548")
-set(dicom3tools_version  "1.0.20260901")
+set(dicom3tools_version  "20260901")
 
 set(linux_x86_64_filename   "dicom3tools-linux-x86_64.tar.gz")
 set(linux_x86_64_sha256     "630fe080dd004e1e93cc615b1443bd2add8921e47473bfb74861be7ae7d99e35")

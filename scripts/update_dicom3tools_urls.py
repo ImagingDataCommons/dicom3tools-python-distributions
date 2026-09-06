@@ -118,9 +118,10 @@ def sha256_of(asset: dict) -> str:
 def version_from_tag(tag: str) -> tuple[str, str]:
     """Return (snapshot, wheel version) for a dicom3tools release tag.
 
-    The wheel version is upstream's 1.00 followed by the snapshot date: 1.0.20260901. See the
-    Versioning section of the README for why the date rather than a serial number, and why the
-    time of day is dropped.
+    The wheel version is the snapshot date and nothing else: 20260901. That is the tag's own
+    first eight digits, taken verbatim -- see the Versioning section of the README for why the
+    date rather than a serial number, why the time of day is dropped, and why the date is not
+    punctuated into 2026.9.1.
     """
     match = TAG_RE.match(tag)
     if match is None:
@@ -130,7 +131,7 @@ def version_from_tag(tag: str) -> tuple[str, str]:
         )
         raise ValueError(msg)
     snapshot = match.group("snapshot")
-    return snapshot, f"1.0.{snapshot[:8]}"
+    return snapshot, snapshot[:8]
 
 
 def generate_block(assets: list[dict], tag: str) -> str:

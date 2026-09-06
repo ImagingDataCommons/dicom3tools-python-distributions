@@ -46,10 +46,16 @@ dependencies = []
 test = [
   "pytest >=6",
   "pytest-cov >=3",
+  # Used by tests/test_package.py to check that the recorded version is already in PEP 440
+  # normal form. pytest pulls it in anyway; named here so the test does not rest on that.
+  "packaging",
 ]
 dev = [
   "pytest >=6",
   "pytest-cov >=3",
+  # Used by tests/test_package.py to check that the recorded version is already in PEP 440
+  # normal form. pytest pulls it in anyway; named here so the test does not rest on that.
+  "packaging",
 ]
 
 [project.urls]
@@ -104,13 +110,13 @@ wheel.py-api = "py3"
 
 [tool.setuptools_scm]
 write_to = "src/dicom3tools/_version.py"
-# Releases are named after the upstream dicom3tools snapshot they package -- 1.0.<YYYYMMDD>,
-# upstream's 1.00 plus the snapshot date -- with packaging-only revisions as PEP 440
-# post-releases (1.0.20260901, then 1.0.20260901.post1). The default version_scheme,
-# guess-next-dev, does not fit that: it reports an untagged commit after 1.0.20260901 as
-# "1.0.20260902.dev2", inventing an upstream snapshot date that almost certainly does not
-# exist. post-release reports "1.0.20260901.post2" instead, which is what the next release from
-# here would actually be called. See the Versioning section of the README.
+# Releases are named after the upstream dicom3tools snapshot they package -- <YYYYMMDD>, the
+# snapshot date and nothing else -- with packaging-only revisions as PEP 440 post-releases
+# (20260901, then 20260901.post1). The default version_scheme, guess-next-dev, does not fit
+# that: it reports an untagged commit after 20260901 as "20260902.dev2", inventing an upstream
+# snapshot date that almost certainly does not exist. post-release reports "20260901.post2"
+# instead, which is what the next release from here would actually be called. See the
+# Versioning section of the README.
 version_scheme = "post-release"
 # Restricted to v-prefixed tags. At its defaults setuptools_scm matches any tag containing a
 # digit, and its default tag_regex has an optional "[\w-]+-" prefix group, so any other tag

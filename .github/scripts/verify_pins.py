@@ -54,7 +54,7 @@ def _check_provenance(text: str, tag: str) -> int:
     snapshot = match.group("snapshot")
     expected = {
         "dicom3tools_snapshot": snapshot,
-        "dicom3tools_version": f"1.0.{snapshot[:8]}",
+        "dicom3tools_version": snapshot[:8],
     }
 
     failures = 0
