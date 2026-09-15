@@ -57,7 +57,7 @@ jobs:
       # test environment (test-command in pyproject.toml). That covers the DICOM round-trip,
       # so a broken archive pin, a missing tool or a binary that cannot read DICOM fails here
       # rather than after publishing.
-      - uses: pypa/cibuildwheel@v4.2.0
+      - uses: pypa/cibuildwheel@v4.2.1
         env:
           CIBW_ARCHS: ${{ matrix.arch }}
 
